@@ -47,6 +47,14 @@
       padding: 10px 12px;
       box-shadow: 0 6px 20px rgba(0,0,0,0.12);
       z-index: 50;
+      transition: transform 0.35s ease, opacity 0.3s ease;
+      transform: translateY(0);
+    }
+
+    .ui.ui-hidden {
+      transform: translateY(calc(-100% - 32px));
+      opacity: 0;
+      pointer-events: none;
     }
 
     .ui button, .ui .toggle {
@@ -102,6 +110,14 @@
       font-size: 14px;
       border: 1px solid rgba(0,0,0,0.1);
       outline: none;
+    }
+
+    @media (hover: none) and (pointer: coarse) {
+      .ui {
+        transform: translateY(0) !important;
+        opacity: 1 !important;
+        pointer-events: auto !important;
+      }
     }
     .panel .row { display:flex; align-items:center; gap:8px; margin-top:8px; }
     .panel label { font-size: 13px; }
@@ -310,7 +326,7 @@
     <div class="cloud c3"></div>
 
     <!-- UI Controls -->
-    <div class="ui" role="toolbar" aria-label="Controls">
+    <div class="ui ui-hidden" role="toolbar" aria-label="Controls">
       <button id="startBtn">Start Rain</button>
       <button id="stopBtn" class="secondary">Stop Rain</button>
       <button id="pickBtn">Pick Winner ✨</button>
@@ -360,6 +376,7 @@
     const LS_USED = 'winnerPicker_used_v1';
 
     const stage = document.getElementById('stage');
+    const uiBar = document.querySelector('.ui');
     const statusEl = document.getElementById('status');
     const startBtn = document.getElementById('startBtn');
     const stopBtn = document.getElementById('stopBtn');
@@ -378,13 +395,80 @@
     const overlay = document.getElementById('overlay');
     const overlayPick = document.getElementById('overlayPick');
 
+    const UI_SHOW_ZONE = 80;
+    let uiHideTimer = null;
+
     const FLY_SPEED_PX_PER_SEC = 260;
+
+    function isUiInteracting() {
+      return uiBar.matches(':hover') ||
+             uiBar.contains(document.activeElement) ||
+             panel.matches(':hover') ||
+             panel.contains(document.activeElement);
+    }
+
+    function showUiBar() {
+      if (uiHideTimer) {
+        clearTimeout(uiHideTimer);
+        uiHideTimer = null;
+      }
+      uiBar.classList.remove('ui-hidden');
+    }
+
+    function scheduleUiHide(delay = 800) {
+      if (panel.classList.contains('open')) return;
+      if (uiHideTimer) clearTimeout(uiHideTimer);
+      uiHideTimer = setTimeout(() => {
+        if (panel.classList.contains('open') || isUiInteracting()) return;
+        uiBar.classList.add('ui-hidden');
+      }, delay);
+    }
 
     let spawnTimer = null;
     let running = false;
     let activeSlips = new Set();
     let flyerLoop = false;
     let flyAnim = null;
+
+    document.addEventListener('mousemove', (event) => {
+      if (event.clientY <= UI_SHOW_ZONE) {
+        showUiBar();
+      } else if (!uiBar.classList.contains('ui-hidden')) {
+        scheduleUiHide();
+      }
+    });
+
+    document.addEventListener('mouseleave', () => scheduleUiHide(0));
+
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Tab') {
+        showUiBar();
+        scheduleUiHide(4000);
+      }
+    });
+
+    document.addEventListener('touchstart', (event) => {
+      if (event.touches && event.touches.length) {
+        const { clientY } = event.touches[0];
+        if (clientY <= UI_SHOW_ZONE + 20) {
+          showUiBar();
+        }
+      }
+    }, { passive: true });
+
+    uiBar.addEventListener('mouseenter', showUiBar);
+    uiBar.addEventListener('mouseleave', () => scheduleUiHide());
+    uiBar.addEventListener('focusin', showUiBar);
+    uiBar.addEventListener('focusout', () => {
+      requestAnimationFrame(() => {
+        if (!uiBar.contains(document.activeElement)) {
+          scheduleUiHide();
+        }
+      });
+    });
+
+    panel.addEventListener('mouseenter', showUiBar);
+    panel.addEventListener('mouseleave', () => scheduleUiHide());
 
     function defaultNames() {
       return [
@@ -576,15 +660,24 @@
     });
 
     gearBtn.addEventListener('click', () => {
-      panel.classList.toggle('open');
+      const isOpen = panel.classList.toggle('open');
       namesInput.value = getNames().join('\n');
+      if (isOpen) {
+        showUiBar();
+      } else {
+        scheduleUiHide(400);
+      }
     });
-    document.getElementById('closePanel').addEventListener('click', () => panel.classList.remove('open'));
+    document.getElementById('closePanel').addEventListener('click', () => {
+      panel.classList.remove('open');
+      scheduleUiHide(400);
+    });
     saveNames.addEventListener('click', () => {
       const lines = namesInput.value.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
       setNames(lines);
       panel.classList.remove('open');
       popToast('Names saved');
+      scheduleUiHide(400);
     });
 
     overlayPick.addEventListener('click', () => {
