@@ -232,7 +232,7 @@
     .hidden { display: none; }
 
     /* Winner badge (optional pop) */
-    .toast {
+    .toast { 
       position: absolute;
       left: 50%;
       top: 54%;
@@ -248,6 +248,45 @@
       pointer-events: none;
     }
     .toast.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+
+    /* Fullscreen pick overlay */
+    .overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(15, 23, 42, 0.35);
+      backdrop-filter: blur(2px);
+      z-index: 120;
+      transition: opacity 0.3s ease;
+    }
+
+    .overlay.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .overlay button {
+      appearance: none;
+      border: none;
+      border-radius: 999px;
+      padding: clamp(18px, 3vw, 26px) clamp(32px, 6vw, 80px);
+      font-size: clamp(20px, 3.8vw, 38px);
+      font-weight: 800;
+      letter-spacing: 0.6px;
+      cursor: pointer;
+      background: radial-gradient(circle at top left, #fbbf24, #f97316);
+      color: #0f172a;
+      box-shadow: 0 18px 38px rgba(15, 23, 42, 0.26);
+      text-transform: uppercase;
+      transition: transform 0.1s ease, box-shadow 0.2s ease;
+    }
+
+    .overlay button:active {
+      transform: translateY(2px);
+      box-shadow: 0 10px 20px rgba(15, 23, 42, 0.22);
+    }
 
     /* Clouds (simple ambience) */
     .cloud {
@@ -305,6 +344,10 @@
     </div>
 
     <div class="toast" id="toast">Winner Picked! 🎉</div>
+
+    <div class="overlay" id="overlay">
+      <button id="overlayPick">Pick This Week's Winner ✨</button>
+    </div>
   </div>
 
   <script>
@@ -333,6 +376,8 @@
     const flyer = document.getElementById('flyer');
     const banner = document.getElementById('banner');
     const toast = document.getElementById('toast');
+    const overlay = document.getElementById('overlay');
+    const overlayPick = document.getElementById('overlayPick');
 
     const FLY_SPEED_PX_PER_SEC = 260;
 
@@ -528,6 +573,7 @@
       localStorage.removeItem(LS_USED);
       popToast('Reset complete');
       updateStatus('Idle');
+      overlay.classList.remove('hidden');
     });
 
     gearBtn.addEventListener('click', () => {
@@ -542,11 +588,17 @@
       popToast('Names saved');
     });
 
+    overlayPick.addEventListener('click', () => {
+      overlay.classList.add('hidden');
+      pickWinner();
+    });
+
     // Init
     updateStatus('Idle');
     if (!localStorage.getItem(LS_KEY)) {
       setNames(defaultNames());
     }
+    startRain();
   </script>
 </body>
 </html>
