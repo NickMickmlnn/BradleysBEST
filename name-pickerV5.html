@@ -376,6 +376,7 @@
 
     const LS_KEY = 'winnerPicker_names_v1';
     const LS_USED = 'winnerPicker_used_v1';
+    const CSV_PATH = 'names.csv';
 
     const stage = document.getElementById('stage');
     const uiBar = document.querySelector('.ui');
@@ -504,6 +505,49 @@
 
     function setUsedSet(set) {
       localStorage.setItem(LS_USED, JSON.stringify(Array.from(set)));
+    }
+
+    async function loadNamesFromCsv() {
+      try {
+        const response = await fetch(CSV_PATH, { cache: 'no-store' });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const text = await response.text();
+        const lines = text.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+        const parsed = [];
+        for (const line of lines) {
+          const parts = line.split(',');
+          if (!parts.length) continue;
+          const first = (parts[0] || '').trim();
+          const last = (parts[1] || '').trim();
+          const isHeader = first && last &&
+            ['firstname', 'first name'].includes(first.toLowerCase()) &&
+            ['lastname', 'last name'].includes(last.toLowerCase());
+          if (isHeader) continue;
+          const fullName = [first, last].filter(Boolean).join(' ').trim();
+          if (fullName) parsed.push(fullName);
+        }
+        const unique = Array.from(new Set(parsed));
+        if (unique.length) {
+          setNames(unique);
+          // prune used list to valid names only
+          const currentUsed = getUsedSet();
+          let changed = false;
+          const validSet = new Set(unique);
+          currentUsed.forEach(name => {
+            if (!validSet.has(name)) {
+              currentUsed.delete(name);
+              changed = true;
+            }
+          });
+          if (changed) setUsedSet(currentUsed);
+          return unique;
+        }
+      } catch (err) {
+        console.error('Failed to load names from CSV', err);
+      }
+      const fallback = defaultNames();
+      setNames(fallback);
+      return fallback;
     }
 
     function updateStatus(msg) { statusEl.textContent = msg; }
@@ -688,11 +732,16 @@
     });
 
     // Init
-    updateStatus('Idle');
-    if (!localStorage.getItem(LS_KEY)) {
-      setNames(defaultNames());
+    async function init() {
+      updateStatus('Idle');
+      const loaded = await loadNamesFromCsv();
+      if (namesInput) {
+        namesInput.value = loaded.join('\n');
+      }
+      startRain();
     }
-    startRain();
+
+    init();
   </script>
 </body>
 </html>
